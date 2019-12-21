@@ -1,7 +1,7 @@
 #
-# Copyright (C) 2019 OpenWrt.org
+# Copyright (C) 2019 IMXQD
 #
-# KFERMercer <KFER.Mercer@gmail.com>
+# IMXQD <ahtlxqd@gmail.com>
 #
 # This is free software, licensed under the GNU General Public License v3.
 #
@@ -10,16 +10,32 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=AdGuardHome
 PROJECT_NAME:=AdGuardHome
-PKG_VERSION:=v0.100.6
+PKG_VERSION:=0.100.6
 PKG_RELEASE:=1
 
+PKG_SOURCE:=AdGuardHome-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL:=https://codeload.github.com/AdguardTeam/AdGuardHome/tar.gz/v$(PKG_VERSION)?
+PKG_HASH:=skip
+PKG_BUILD_DIR:=$(BUILD_DIR)/AdGuardHome-$(PKG_VERSION)
+
+PKG_BUILD_DEPENDS:=golang/host node/host
+PKG_BUILD_PARALLEL:=1
+PKG_USE_MIPS16:=0
+STRIP:=true
+GO_PKG:=github.com/AdguardTeam/AdGuardHome
+GO_PKG_LDFLAGS:=-s -w
+GO_PKG_LDFLAGS_X:=main.version=v$(PKG_VERSION)
+GO_PKG_GCFLAGS:="-trimpath=$(PWD)"
+
 include $(INCLUDE_DIR)/package.mk
+include ../../lang/golang/golang-package.mk
 
 define Package/$(PKG_NAME)
 	SECTION:=net
 	CATEGORY:=Network
 	TITLE:=Network-wide ads & trackers blocking DNS server
 	URL:=https://github.com/AdguardTeam/AdGuardHome
+	DEPENDS:=$(GO_ARCH_DEPENDS)
 endef
 
 
@@ -27,60 +43,27 @@ define Package/$(PKG_NAME)/description
 Network-wide ads & trackers blocking DNS server
 endef
 
-STRIP:=true
-
-ifeq ($(ARCH),i386)
-	PKG_ARCH_ADGUARDHOME:=386
-endif
-
-ifeq ($(ARCH),x86_64)
-	PKG_ARCH_ADGUARDHOME:=amd64
-endif
-
-ifeq ($(ARCH),mipsel)
-	PKG_ARCH_ADGUARDHOME:=mipsle
-endif
-
-ifeq ($(ARCH),mips)
-	PKG_ARCH_ADGUARDHOME:=mips
-endif
-
-ifeq ($(ARCH),arm)
-	PKG_ARCH_ADGUARDHOME:=arm
-endif
-
-ifeq ($(ARCH),arm64)
-	PKG_ARCH_ADGUARDHOME:=arm64
-endif
-
-ifeq ($(ARCH),aarch64)
-	PKG_ARCH_ADGUARDHOME:=arm64
-endif
-
-TAR_NAME:=AdGuardHome_linux_$(PKG_ARCH_ADGUARDHOME)
-
-PKG_SOURCE:=$(TAR_NAME).tar.gz
-
-PKG_SOURCE_URL:=https://github.com/AdguardTeam/AdGuardHome/releases/download/$(PKG_VERSION)/
-
-UNTAR_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)/$(PKG_NAME)-extract/$(PKG_ARCH_ADGUARDHOME)
-
-PKG_HASH:=skip
-
-define Build/Prepare
-	mkdir -vp $(UNTAR_DIR)
-	tar -zxvf $(DL_DIR)/$(PKG_SOURCE) -C $(UNTAR_DIR)
-endef
-
 define Build/Configure
+	( \
+		cd $(PKG_BUILD_DIR); \
+		npm --prefix client ci; \
+		npm --prefix client run build-prod; \
+		export GOPATH=$(GO_PKG_TMP_DIR) ; \
+		GO111MODULE=off go get -v github.com/gobuffalo/packr/... ; \
+		$(GO_PKG_TMP_DIR)/bin/packr clean ; \
+		$(GO_PKG_TMP_DIR)/bin/packr -i ./home -zv ; \
+		unset GOPATH \
+	)
+	$(call GoPackage/Build/Configure)
 endef
 
-define Build/Compile
-endef
+Build/Compile=$(call GoPackage/Build/Compile)
 
 define Package/$(PKG_NAME)/install
+	$(call GoPackage/Package/Install/Bin,$(PKG_INSTALL_DIR))
 	$(INSTALL_DIR) $(1)/usr/bin/AdGuardHome
-	$(INSTALL_BIN) $(UNTAR_DIR)/*/$(PROJECT_NAME) $(1)/usr/bin/AdGuardHome/$(PKG_NAME)
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/AdGuardHome $(1)/usr/bin/AdGuardHome/$(PKG_NAME)
 endef
 
-$(eval $(call BuildPackage,$(PKG_NAME)))
+$(eval $(call GoBinPackage,AdGuardHome))
+$(eval $(call BuildPackage,AdGuardHome))
