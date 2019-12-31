@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=AdGuardHome
 PROJECT_NAME:=AdGuardHome
-PKG_VERSION:=0.100.6
+PKG_VERSION:=0.100.8
 PKG_RELEASE:=1
 
 PKG_SOURCE:=AdGuardHome-$(PKG_VERSION).tar.gz
